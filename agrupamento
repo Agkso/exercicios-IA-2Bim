@@ -1,0 +1,417 @@
+import warnings
+warnings.filterwarnings("ignore")
+
+import pandas as pd
+import matplotlib.pyplot as plt
+
+from sklearn.preprocessing import StandardScaler
+from sklearn.cluster import KMeans, AgglomerativeClustering, DBSCAN
+from sklearn.decomposition import PCA
+from sklearn.metrics import silhouette_score
+
+
+# ==========================================================
+# BASE DE DADOS
+# ==========================================================
+
+dados = pd.DataFrame({
+    "Cliente": [f"C{i}" for i in range(1, 21)],
+
+    "Idade": [
+        19, 21, 22, 24, 25,
+        28, 30, 32, 35, 37,
+        40, 42, 45, 48, 50,
+        55, 58, 60, 63, 67
+    ],
+
+    "Peso": [
+        60, 62, 64, 66, 68,
+        70, 72, 74, 76, 78,
+        82, 84, 86, 88, 90,
+        92, 95, 97, 100, 103
+    ],
+
+    "TreinosSemana": [
+        6, 6, 5, 5, 5,
+        4, 4, 4, 3, 3,
+        3, 2, 2, 2, 1,
+        1, 1, 1, 0, 0
+    ],
+
+    "ConsumoAgua": [
+        3.5, 3.4, 3.3, 3.2, 3.1,
+        3.0, 2.9, 2.8, 2.7, 2.6,
+        2.5, 2.4, 2.3, 2.2, 2.1,
+        2.0, 1.9, 1.8, 1.7, 1.6
+    ],
+
+    "HorasSono": [
+        8, 8, 8, 7, 7,
+        7, 7, 6, 6, 6,
+        6, 5, 5, 5, 5,
+        4, 4, 4, 4, 4
+    ],
+
+    "IMC": [
+        21, 22, 22, 23, 23,
+        24, 24, 25, 25, 26,
+        27, 27, 28, 29, 29,
+        30, 31, 31, 32, 33
+    ]
+})
+
+print(dados.head())
+
+
+# ==========================================================
+# ATRIBUTOS
+# ==========================================================
+
+atributos = [
+    "Idade",
+    "Peso",
+    "TreinosSemana",
+    "ConsumoAgua",
+    "HorasSono",
+    "IMC"
+]
+
+X = dados[atributos]
+
+print(X.head())
+
+
+# ==========================================================
+# NORMALIZAÇÃO
+# ==========================================================
+
+normalizador = StandardScaler()
+
+X_normalizado = normalizador.fit_transform(X)
+
+print(X_normalizado)
+
+
+# ==========================================================
+# K-MEANS
+# ==========================================================
+
+kmeans = KMeans(
+    n_clusters=4,
+    random_state=123,
+    n_init=20
+)
+
+dados["Cluster_KMeans"] = kmeans.fit_predict(X_normalizado)
+
+print(dados[["Cliente", "Cluster_KMeans"]])
+
+
+# ==========================================================
+# AGNES
+# ==========================================================
+
+agnes = AgglomerativeClustering(
+    n_clusters=4,
+    linkage="ward"
+)
+
+dados["Cluster_AGNES"] = agnes.fit_predict(X_normalizado)
+
+print(dados[["Cliente", "Cluster_AGNES"]])
+
+
+# ==========================================================
+# DBSCAN
+# ==========================================================
+
+dbscan = DBSCAN(
+    eps=1.2,
+    min_samples=3
+)
+
+dados["Cluster_DBSCAN"] = dbscan.fit_predict(X_normalizado)
+
+print(dados[["Cliente", "Cluster_DBSCAN"]])
+
+
+# ==========================================================
+# RESULTADO COMPLETO
+# ==========================================================
+
+print(
+    dados[
+        [
+            "Cliente",
+            "Idade",
+            "Peso",
+            "TreinosSemana",
+            "ConsumoAgua",
+            "HorasSono",
+            "IMC",
+            "Cluster_KMeans",
+            "Cluster_AGNES",
+            "Cluster_DBSCAN"
+        ]
+    ]
+)
+
+
+# ==========================================================
+# SILHOUETTE
+# ==========================================================
+
+def calcular_silhouette(labels):
+
+    grupos = set(labels)
+
+    if len(grupos) <= 1:
+        return None
+
+    grupos_reais = [g for g in grupos if g != -1]
+
+    if len(grupos_reais) < 2:
+        return None
+
+    return silhouette_score(X_normalizado, labels)
+
+
+resultados = pd.DataFrame({
+    "Algoritmo": [
+        "K-Means",
+        "AGNES",
+        "DBSCAN"
+    ],
+    "Silhouette": [
+        calcular_silhouette(dados["Cluster_KMeans"]),
+        calcular_silhouette(dados["Cluster_AGNES"]),
+        calcular_silhouette(dados["Cluster_DBSCAN"])
+    ]
+})
+
+print(resultados)
+
+
+# ==========================================================
+# PCA
+# ==========================================================
+
+pca = PCA(n_components=2)
+
+X_pca = pca.fit_transform(X_normalizado)
+
+dados["PCA1"] = X_pca[:, 0]
+dados["PCA2"] = X_pca[:, 1]
+
+print(dados.head())
+
+
+# ==========================================================
+# GRÁFICO K-MEANS
+# ==========================================================
+
+plt.figure(figsize=(8, 5))
+
+plt.scatter(
+    dados["PCA1"],
+    dados["PCA2"],
+    c=dados["Cluster_KMeans"],
+    cmap="viridis",
+    s=100
+)
+
+for i, cliente in enumerate(dados["Cliente"]):
+    plt.text(
+        dados["PCA1"][i],
+        dados["PCA2"][i],
+        cliente
+    )
+
+plt.title("Agrupamento K-Means")
+plt.xlabel("PCA 1")
+plt.ylabel("PCA 2")
+plt.show()
+
+
+# ==========================================================
+# GRÁFICO AGNES
+# ==========================================================
+
+plt.figure(figsize=(8, 5))
+
+plt.scatter(
+    dados["PCA1"],
+    dados["PCA2"],
+    c=dados["Cluster_AGNES"],
+    cmap="plasma",
+    s=100
+)
+
+for i, cliente in enumerate(dados["Cliente"]):
+    plt.text(
+        dados["PCA1"][i],
+        dados["PCA2"][i],
+        cliente
+    )
+
+plt.title("Agrupamento AGNES")
+plt.xlabel("PCA 1")
+plt.ylabel("PCA 2")
+plt.show()
+
+
+# ==========================================================
+# GRÁFICO DBSCAN
+# ==========================================================
+
+plt.figure(figsize=(8, 5))
+
+plt.scatter(
+    dados["PCA1"],
+    dados["PCA2"],
+    c=dados["Cluster_DBSCAN"],
+    cmap="coolwarm",
+    s=100
+)
+
+for i, cliente in enumerate(dados["Cliente"]):
+    plt.text(
+        dados["PCA1"][i],
+        dados["PCA2"][i],
+        cliente
+    )
+
+plt.title("Agrupamento DBSCAN")
+plt.xlabel("PCA 1")
+plt.ylabel("PCA 2")
+plt.show()
+
+
+# ==========================================================
+# PERFIL K-MEANS
+# ==========================================================
+
+perfil_kmeans = dados.groupby(
+    "Cluster_KMeans"
+)[atributos].mean()
+
+print(perfil_kmeans)
+
+for cluster, linha in perfil_kmeans.iterrows():
+
+    print(f"\nCluster {cluster} - K-Means")
+
+    print(f"Idade média: {linha['Idade']:.1f}")
+    print(f"Peso médio: {linha['Peso']:.1f} kg")
+    print(f"Treinos/semana: {linha['TreinosSemana']:.1f}")
+    print(f"Consumo de água: {linha['ConsumoAgua']:.1f} L")
+    print(f"Horas de sono: {linha['HorasSono']:.1f}")
+    print(f"IMC médio: {linha['IMC']:.1f}")
+
+
+# ==========================================================
+# PERFIL AGNES
+# ==========================================================
+
+perfil_agnes = dados.groupby(
+    "Cluster_AGNES"
+)[atributos].mean()
+
+print(perfil_agnes)
+
+for cluster, linha in perfil_agnes.iterrows():
+
+    print(f"\nCluster {cluster} - AGNES")
+
+    print(f"Idade média: {linha['Idade']:.1f}")
+    print(f"Peso médio: {linha['Peso']:.1f} kg")
+    print(f"Treinos/semana: {linha['TreinosSemana']:.1f}")
+    print(f"Consumo de água: {linha['ConsumoAgua']:.1f} L")
+    print(f"Horas de sono: {linha['HorasSono']:.1f}")
+    print(f"IMC médio: {linha['IMC']:.1f}")
+
+
+# ==========================================================
+# PERFIL DBSCAN
+# ==========================================================
+
+perfil_dbscan = dados.groupby(
+    "Cluster_DBSCAN"
+)[atributos].mean()
+
+print(perfil_dbscan)
+
+for cluster, linha in perfil_dbscan.iterrows():
+
+    if cluster == -1:
+        nome = "Ruído / Outliers"
+    else:
+        nome = f"Cluster {cluster}"
+
+    print(f"\n{nome} - DBSCAN")
+
+    print(f"Idade média: {linha['Idade']:.1f}")
+    print(f"Peso médio: {linha['Peso']:.1f} kg")
+    print(f"Treinos/semana: {linha['TreinosSemana']:.1f}")
+    print(f"Consumo de água: {linha['ConsumoAgua']:.1f} L")
+    print(f"Horas de sono: {linha['HorasSono']:.1f}")
+    print(f"IMC médio: {linha['IMC']:.1f}")
+
+
+# ==========================================================
+# INTERPRETAÇÃO DOS CLUSTERS
+# ==========================================================
+
+def interpretar_clusters(dados, coluna_cluster):
+
+    perfis = dados.groupby(
+        coluna_cluster
+    )[atributos].mean()
+
+    for cluster, linha in perfis.iterrows():
+
+        print("=" * 60)
+
+        if cluster == -1:
+            print("Grupo -1: possíveis outliers")
+        else:
+            print(f"Grupo {cluster}")
+
+        interpretacao = []
+
+        if linha["Idade"] >= 50:
+            interpretacao.append("clientes mais velhos")
+        elif linha["Idade"] <= 30:
+            interpretacao.append("clientes mais jovens")
+
+        if linha["TreinosSemana"] >= 5:
+            interpretacao.append("alta frequência de treino")
+        elif linha["TreinosSemana"] <= 1:
+            interpretacao.append("baixa frequência de treino")
+
+        if linha["ConsumoAgua"] >= 3:
+            interpretacao.append("boa hidratação")
+        elif linha["ConsumoAgua"] <= 2:
+            interpretacao.append("hidratação insuficiente")
+
+        if linha["HorasSono"] >= 7:
+            interpretacao.append("sono adequado")
+        elif linha["HorasSono"] <= 5:
+            interpretacao.append("poucas horas de sono")
+
+        if linha["IMC"] >= 30:
+            interpretacao.append("IMC elevado")
+        elif linha["IMC"] <= 24:
+            interpretacao.append("IMC dentro da faixa saudável")
+
+        print("Perfil:", ", ".join(interpretacao))
+
+
+print("\nINTERPRETAÇÃO K-MEANS")
+interpretar_clusters(dados, "Cluster_KMeans")
+
+print("\nINTERPRETAÇÃO AGNES")
+interpretar_clusters(dados, "Cluster_AGNES")
+
+print("\nINTERPRETAÇÃO DBSCAN")
+interpretar_clusters(dados, "Cluster_DBSCAN")
