@@ -1,0 +1,219 @@
+import pandas as pd
+
+from mlxtend.preprocessing import TransactionEncoder
+from mlxtend.frequent_patterns import apriori, association_rules
+
+import logging
+import warnings
+import os
+
+# ==========================================================
+# CONFIGURAÇÕES
+# ==========================================================
+
+logging.getLogger().setLevel(logging.CRITICAL)
+
+for nome in ["matplotlib", "PIL", "numexpr", "tensorflow", "absl"]:
+    logging.getLogger(nome).setLevel(logging.CRITICAL)
+
+warnings.filterwarnings("ignore")
+
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
+
+
+# ==========================================================
+# BASE DE DADOS
+# ==========================================================
+
+dados = pd.DataFrame({
+    "Cliente": [
+        "C1","C2","C3","C4","C5",
+        "C6","C7","C8","C9","C10",
+        "C11","C12"
+    ],
+
+    "TipoCliente": [
+        "Frequente","Frequente","Novo","Novo",
+        "Frequente","Ocasional","Ocasional",
+        "Novo","Frequente","Ocasional",
+        "Frequente","Novo"
+    ],
+
+    "ProdutoPrincipal": [
+        "Carnes","Carnes","Bebidas","Limpeza",
+        "Carnes","Padaria","Padaria",
+        "Bebidas","Carnes","Limpeza",
+        "Carnes","Bebidas"
+    ],
+
+    "FormaPagamento": [
+        "Cartao","Pix","Pix","Dinheiro",
+        "Cartao","Dinheiro","Pix",
+        "Pix","Cartao","Dinheiro",
+        "Cartao","Pix"
+    ],
+
+    "DiaCompra": [
+        "FimSemana","FimSemana","Semana","Semana",
+        "FimSemana","Semana","Semana",
+        "FimSemana","FimSemana","Semana",
+        "FimSemana","FimSemana"
+    ],
+
+    "CompraPremium": [
+        "Sim","Sim","Nao","Nao",
+        "Sim","Nao","Nao",
+        "Nao","Sim","Nao",
+        "Sim","Nao"
+    ]
+})
+
+print(dados)
+
+
+# ==========================================================
+# TRANSAÇÕES
+# ==========================================================
+
+transacoes = []
+
+for _, linha in dados.iterrows():
+
+    transacao = [
+        f"TipoCliente={linha['TipoCliente']}",
+        f"ProdutoPrincipal={linha['ProdutoPrincipal']}",
+        f"FormaPagamento={linha['FormaPagamento']}",
+        f"DiaCompra={linha['DiaCompra']}",
+        f"CompraPremium={linha['CompraPremium']}"
+    ]
+
+    transacoes.append(transacao)
+
+print(transacoes)
+
+
+# ==========================================================
+# TRANSFORMAÇÃO BINÁRIA
+# ==========================================================
+
+te = TransactionEncoder()
+
+matriz = te.fit(transacoes).transform(transacoes)
+
+dados_transformados = pd.DataFrame(
+    matriz,
+    columns=te.columns_
+)
+
+print(dados_transformados)
+
+
+# ==========================================================
+# APRIORI
+# ==========================================================
+
+itemsets_frequentes = apriori(
+    dados_transformados,
+    min_support=0.25,
+    use_colnames=True
+)
+
+print(
+    itemsets_frequentes.sort_values(
+        by="support",
+        ascending=False
+    )
+)
+
+
+# ==========================================================
+# REGRAS DE ASSOCIAÇÃO
+# ==========================================================
+
+regras = association_rules(
+    itemsets_frequentes,
+    metric="lift",
+    min_threshold=1.2
+)
+
+regras_resumidas = regras[
+    [
+        "antecedents",
+        "consequents",
+        "support",
+        "confidence",
+        "lift"
+    ]
+]
+
+print(
+    regras_resumidas.sort_values(
+        by="lift",
+        ascending=False
+    )
+)
+
+
+# ==========================================================
+# FORMATAR REGRAS
+# ==========================================================
+
+def formatar_conjunto(conjunto):
+    return ", ".join(list(conjunto))
+
+
+regras_resumidas = regras_resumidas.copy()
+
+regras_resumidas["Regra"] = regras_resumidas.apply(
+    lambda linha:
+    f"{formatar_conjunto(linha['antecedents'])} → "
+    f"{formatar_conjunto(linha['consequents'])}",
+    axis=1
+)
+
+print(
+    regras_resumidas[
+        ["Regra", "support", "confidence", "lift"]
+    ].sort_values(
+        by="lift",
+        ascending=False
+    )
+)
+
+
+# ==========================================================
+# REGRAS PARA COMPRA PREMIUM
+# ==========================================================
+
+regras_premium = regras_resumidas[
+    regras_resumidas["consequents"].apply(
+        lambda x: "CompraPremium=Sim" in x
+    )
+]
+
+print("\nREGRAS PARA COMPRA PREMIUM\n")
+
+print(
+    regras_premium[
+        ["Regra", "support", "confidence", "lift"]
+    ]
+)
+
+
+# ==========================================================
+# REGRAS PARA NÃO PREMIUM
+# ==========================================================
+
+regras_nao_premium = regras_resumidas[
+    regras_resumidas["consequents"].apply(
+        lambda x: "CompraPremium=Nao" in x
+    )
+]
+
+print("\nREGRAS PARA NÃO PREMIUM\n")
+
+print(
+    regras_nao_premium[
+        ["Regra", "support", "confidence", "lift"]
+    ]
+)
